@@ -76,11 +76,83 @@ void setup()
 }
 
 void loop() {
+  // read the state of the switch into a local variable:
+  int reading = digitalRead(TORQUE_BUTTON_PIN);
+
+  // check to see if you just pressed the button 
+  // (i.e. the input went from LOW to HIGH),  and you've waited 
+  // long enough since the last press to ignore any noise:  
+
+  // If the switch changed, due to noise or pressing:
+  if (reading != lastButtonState) {
+    // reset the debouncing timer
+    lastDebounceTime = millis();
+  } 
   
+  if ((millis() - lastDebounceTime) > debounceDelay) {
+    // whatever the reading is at, it's been there for longer
+    // than the debounce delay, so take it as the actual current state:
+
+    // if the button state has changed:
+    if (reading != buttonState) {
+      buttonState = reading;
+
+      // only toggle the LED if the new button state is HIGH
+      if (buttonState == HIGH) {
+        isTorqeOn = !isTorqeOn;
+      Serial.print("t swap ");
+        if(isTorqeOn == 0)
+        {
+          RelaxServos();
+        }
+        
+        else
+        {
+          TorqueServos();
+          
+        }
+
+
+      }
+    }
+  }
+    // save the reading.  Next time through the loop,
+  // it'll be the lastButtonState:
+  lastButtonState = reading;
+
+
 
 
 
 
 }
 
+
+void RelaxServos()
+{
+  
+    for(int i = 0; i<SERVOCOUNT;i++)
+    {
+      int id = i+1;
+      Relax(id);
+
+      delay(50);
+    }
+  
+  
+}
+    
+
+void TorqueServos()
+{
+    for(int i = 0; i<SERVOCOUNT;i++)
+    {
+      int id = i+1;
+      TorqueOn(id);
+
+      delay(50);
+    }
+  
+}
+    
 
