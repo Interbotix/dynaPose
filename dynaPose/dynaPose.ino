@@ -18,7 +18,7 @@
 
 #define NUMBER_OF_MODES 4;
 
-#define MAX_POSES 5
+//#define MAX_POSES 5
 
 #define lcd lcd
 
@@ -58,7 +58,9 @@ long debounceDelay = 50;    // the debounce time; increase if the output flicker
 
 int reading[5];
   
- int poses[MAX_POSES][SERVOCOUNT+1]; //10 poses
+int MAX_POSES  = 5;
+  
+//int poses[MAX_POSES][SERVOCOUNT+1]; //10 poses
 void setup()
 {
   
@@ -87,6 +89,15 @@ void setup()
   delay(100);  
   lcd.setCursor(0, 0);
   lcd.print("M:Set");
+  
+  lcd.setCursor(0, 1);
+  RelaxServos();
+  lcd.print("T:Off ");
+
+  lcd.setCursor(8, 1);
+  lcd.print("Pose ");
+  lcd.print(currentPose);
+        
 }
 
 void loop() 
@@ -127,15 +138,25 @@ void loop()
     switch(mode)
     {
      case 0:
-         poses[currentPose][0] = SERVOCOUNT;
+         //poses[currentPose][0] = SERVOCOUNT;
+         EEPROM.write(0, MAX_POSES);
+         
         for(int i = 0; i<SERVOCOUNT;i++)
         {
           int id = i+1;
-          poses[currentPose][id] = GetPosition(id);
+          EEPROMWriteInt(currentPose*(20)+1+ 2*i, GetPosition(id));
+          
+          //poses[currentPose][id] = GetPosition(id);
         }
         lcd.setCursor(8, 0);
         lcd.print("Saved");
         lcd.print(currentPose);
+        
+        currentPose = (currentPose +1)%MAX_POSES;
+        lcd.setCursor(8, 1);
+        lcd.print("Pose ");
+        lcd.print(currentPose);
+        
         
 
        break;
@@ -147,7 +168,7 @@ void loop()
         {
           int id = i+1;
          // SetPosition(id, positions[i]);
-         bioloid.setNextPose(id,poses[currentPose][id]);
+         bioloid.setNextPose(id,EEPROMReadInt(currentPose*(20)+1+ 2*i));
          }
 
         bioloid.interpolateSetup(1000); // setup for interpolation from current->next over 1/2 a second
@@ -165,7 +186,7 @@ void loop()
          {
           
           
-        lcd.setCursor(8, 0);
+        lcd.setCursor(8, 1);
         lcd.print("Pose ");
         lcd.print(currentPose);
         
@@ -179,7 +200,9 @@ void loop()
             {
               int id = i+1;
              // SetPosition(id, positions[i]);
-             bioloid.setNextPose(id,poses[currentPose][id]);
+            // bioloid.setNextPose(id,poses[currentPose][id]);
+            
+         bioloid.setNextPose(id,EEPROMReadInt(currentPose*(20)+1+ 2*i));
              }
     
             bioloid.interpolateSetup(1000); // setup for interpolation from current->next over 1/2 a second
@@ -189,8 +212,14 @@ void loop()
                delay(3);
              }
              currentPose = (currentPose + 1)% MAX_POSES;
-           
-            delay(1000);
+            
+            
+            lcd.setCursor(0, 1);
+            lcd.print("delay ");
+            lcd.print(analogRead(0) * 1);
+            
+            delay(analogRead(0) * 1);
+          
          }
      
 
@@ -251,31 +280,48 @@ void loop()
   if(debounceDigitalRead(3) == true)
   {
         
-
-    currentPose = (currentPose -1);
-    if(currentPose < 0)
+    if(mode ==5)
     {
-      currentPose = MAX_POSES-1;
+      MAX_POSES = MAX_POSES - 1;
+      if(currentPose < 1)
+      {
+        MAX_POSES =1;
+      }
+      
     }
-    
-  // set the cursor to column 0, line 1
-  // (note: line 1 is the second row, since counting begins with 0):
-  lcd.setCursor(9, 1);
-  lcd.print("Pose:");
-  lcd.print(currentPose);
-  
+    else
+    {
+      currentPose = (currentPose -1);
+      if(currentPose < 0)
+      {
+        currentPose = MAX_POSES-1;
+      }
+      
+      // set the cursor to column 0, line 1
+      // (note: line 1 is the second row, since counting begins with 0):
+      lcd.setCursor(9, 1);
+      lcd.print("Pose:");
+      lcd.print(currentPose);
+    }
    
   }
 //next
   if(debounceDigitalRead(4) == true)
-  {
-    currentPose = (currentPose +1)    % MAX_POSES;
-  // set the cursor to column 0, line 1
-  // (note: line 1 is the second row, since counting begins with 0):
-  lcd.setCursor(9, 1);
-    lcd.print("Pose:");
-    lcd.print(currentPose);
-    
+  {    
+    if(mode ==5)
+    {
+      MAX_POSES = MAX_POSES + 1;
+      
+    }
+    else
+    {
+        currentPose = (currentPose +1)    % MAX_POSES;
+      // set the cursor to column 0, line 1
+      // (note: line 1 is the second row, since counting begins with 0):
+      lcd.setCursor(9, 1);
+        lcd.print("Pose:");
+        lcd.print(currentPose);
+    }
    
     
   }
