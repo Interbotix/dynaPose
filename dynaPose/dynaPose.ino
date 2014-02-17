@@ -1,6 +1,11 @@
 #include <ax12.h>
 #include <BioloidController.h>
+
+#include <EEPROM.h> //Needed to access the eeprom read write functions
+
 //#include "poses.h"
+
+
 
 #define SERVOCOUNT 8
 #define LED_PIN 0
@@ -10,7 +15,30 @@
 #define PREV_BUTTON_PIN  4
 #define NEXT_BUTTON_PIN  5
 
+
+#define NUMBER_OF_MODES 4;
+
 #define MAX_POSES 5
+
+#define lcd lcd
+
+#define USE_LCD
+//#define
+
+#ifdef USE_LCD
+  //include the I2C Wire library - needed for communication with the I2C chip attached to the LCD manual 
+  #include <Wire.h> 
+  // include the RobotGeekLCD library
+  #include <RobotGeekLCD.h>
+  
+  // create a robotgeekLCD object named 'lcd'
+  RobotGeekLCD lcd;
+#else 
+  //serial
+
+#endif
+
+
 
 BioloidController bioloid = BioloidController(1000000);
 
@@ -20,6 +48,8 @@ int buttonState[5];             // the current reading from the input pin
 int lastButtonState[5] = {LOW,LOW,LOW,LOW,LOW};   // the previous reading from the input pin
 int isTorqeOn = 1;
 int currentPose = 0;
+
+int mode = 0; //mode 0= save 1=set 2 = play 3 = position export
 
 // the following variables are long's because the time, measured in miliseconds,
 // will quickly become a bigger number than can be stored in an int.
@@ -31,147 +61,190 @@ int reading[5];
  int poses[MAX_POSES][SERVOCOUNT+1]; //10 poses
 void setup()
 {
+  
+  
+  #ifdef USE_LCD
+    // initlaize the lcd object - this sets up all the variables and IIC setup for the LCD object to work
+    lcd.init();
+    lcd.print("DynaPose");
+    delay(1000);
+    lcd.clear();
+  #else 
+    Serial.begin(9600);
+
+  #endif
+  
+  
+  
   pinMode(TORQUE_BUTTON_PIN, INPUT);
   pinMode(ENTER_BUTTON_PIN, INPUT);
   pinMode(MODE_BUTTON_PIN, INPUT);
   pinMode(PREV_BUTTON_PIN, INPUT);
   pinMode(NEXT_BUTTON_PIN, INPUT);
   pinMode(LED_PIN, OUTPUT);
-   positions[0] = SERVOCOUNT;
-   Serial.begin(9600);
-   delay(1000);
-      Serial.print(" ");
+  positions[0] = SERVOCOUNT;
   
-    for(int i = 0; i<SERVOCOUNT;i++)
-    {
-      int id = i+1;
-      Relax(id);
-      delay(10);
-      positions[id] = GetPosition(id);
-      positions[id] =  ax12GetRegister(id, 36, 2);
-      Serial.print(id);
-      Serial.print("ss ");
-      Serial.print(id);
-      Serial.print(" ");
-      Serial.println(positions[id]);
-   
-    }
-    
-  //  delay(5000);
-   
-    bioloid.poseSize = SERVOCOUNT;//2 servos, so the pose size will be 2
-  bioloid.readPose();//find where the servos are currently
- 
-    for(int i = 0; i<SERVOCOUNT;i++)
-    {
-      int id = i+1;
-    
-      //TorqueOn(id);
-      
-     // SetPosition(id, positions[i]);
-     bioloid.setNextPose(id,positions[id]);
-     
-      
-      Serial.print(id);
-      Serial.print("f");
-    }
-      
-      
-    //bioloid.loadPose(positions);   // load the pose from FLASH, into the nextPose buffer
-   // bioloid.readPose();            // read in current servo positions to the curPose buffer
-
-    bioloid.interpolateSetup(1000); // setup for interpolation from current->next over 1/2 a second
-    while(bioloid.interpolating > 0){  // do this while we have not reached our new pose
-        bioloid.interpolateStep();     // move servos, if necessary. 
-        delay(3);
-      
-      
-      
-    }
-    //delay(5000);
-    
-    
+  delay(100);  
+  lcd.setCursor(0, 0);
+  lcd.print("M:Set");
 }
 
 void loop() 
 {
-  digitalWrite(LED_PIN, HIGH);
   
+    
+  digitalWrite(LED_PIN, HIGH);
+  //torque
   if(debounceDigitalRead(0) == true)
   {
-      isTorqeOn = !isTorqeOn;
-      Serial.print("t swap ");
+        isTorqeOn = !isTorqeOn;
+      
+        // set the cursor to column 0, line 1
+        // (note: line 1 is the second row, since counting begins with 0):
+        lcd.setCursor(0, 1);
         if(isTorqeOn == 0)
         {
           RelaxServos();
+        lcd.print("T:Off ");
         }
         
         else
         {
           TorqueServos();
+        lcd.print("T:On ");
         }
   }
 
+  //enter
   if(debounceDigitalRead(1) == true)
   {
-    //poses[currentPose] = positions;    
-    //memcpy(poses[currentPose],positions,SERVOCOUNT+1);
-    poses[currentPose][0] = SERVOCOUNT;
-    for(int i = 0; i<SERVOCOUNT;i++)
-    {
-      int id = i+1;
-      //Relax(id);
-      //delay(10);
-      poses[currentPose][id] = GetPosition(id);
-     // positions[id] =  ax12GetRegister(id, 36, 2);
+    
+
+    
+    
+    
         
+    switch(mode)
+    {
+     case 0:
+         poses[currentPose][0] = SERVOCOUNT;
+        for(int i = 0; i<SERVOCOUNT;i++)
+        {
+          int id = i+1;
+          poses[currentPose][id] = GetPosition(id);
+        }
+        lcd.setCursor(8, 0);
+        lcd.print("Saved");
+        lcd.print(currentPose);
+        
+
+       break;
+     case 1:
+        bioloid.poseSize = SERVOCOUNT;//2 servos, so the pose size will be 2
+        bioloid.readPose();//find where the servos are currently
+ 
+        for(int i = 0; i<SERVOCOUNT;i++)
+        {
+          int id = i+1;
+         // SetPosition(id, positions[i]);
+         bioloid.setNextPose(id,poses[currentPose][id]);
+         }
+
+        bioloid.interpolateSetup(1000); // setup for interpolation from current->next over 1/2 a second
+         while(bioloid.interpolating > 0)
+         {  // do this while we have not reached our new pose
+           bioloid.interpolateStep();     // move servos, if necessary. 
+           delay(3);
+         }
+       
+
+       break;
+     case 2:
+         currentPose = 0;
+         while(1) //loop forever
+         {
+          
+          
+        lcd.setCursor(8, 0);
+        lcd.print("Pose ");
+        lcd.print(currentPose);
+        
+          
+          
+          
+            bioloid.poseSize = SERVOCOUNT;//2 servos, so the pose size will be 2
+            bioloid.readPose();//find where the servos are currently
+     
+            for(int i = 0; i<SERVOCOUNT;i++)
+            {
+              int id = i+1;
+             // SetPosition(id, positions[i]);
+             bioloid.setNextPose(id,poses[currentPose][id]);
+             }
+    
+            bioloid.interpolateSetup(1000); // setup for interpolation from current->next over 1/2 a second
+             while(bioloid.interpolating > 0)
+             {  // do this while we have not reached our new pose
+               bioloid.interpolateStep();     // move servos, if necessary. 
+               delay(3);
+             }
+             currentPose = (currentPose + 1)% MAX_POSES;
+           
+            delay(1000);
+         }
+     
+
+
+       break;
+     case 3:
+ 
+ 
+       break;
+      
     }
     
     
-    
-    Serial.println( poses[0][0]);
-    Serial.println( poses[0][1]);
-    Serial.println( poses[0][2]);
-    Serial.println( poses[0][3]);
-    Serial.println("  ");
     
     
 
   }
 
+
+//mode
   if(debounceDigitalRead(2) == true)
   {
+    mode = (mode + 1) % NUMBER_OF_MODES;
     
-//        poses[0][1] = 512;
-//        poses[0][2] = 512;
-//        poses[0][3] = 512;
-    
-    
-    bioloid.poseSize = SERVOCOUNT;//2 servos, so the pose size will be 2
-    bioloid.readPose();//find where the servos are currently
- 
-    for(int i = 0; i<SERVOCOUNT;i++)
+    switch(mode)
     {
-      int id = i+1;
-    
-      //TorqueOn(id);
+     case 0:
+       lcd.clear();
+       lcd.setCursor(0,0);
+       lcd.print("M:Save");
+       break;
+     case 1:
+       lcd.clear();
+       lcd.setCursor(0,0);
+       lcd.print("M:Set");
+       break;
+     case 2:
+       lcd.clear();
+       lcd.setCursor(0,0);
+       lcd.print("M:Play");
+       break;
+     case 3:
       
-     // SetPosition(id, positions[i]);
-     bioloid.setNextPose(id,poses[currentPose][id]);
-   
-   
-    
+       lcd.clear();
+       lcd.setCursor(0,0);
+       lcd.print("M:Output");
+       break;
       
     }
     
-    
-    
-        bioloid.interpolateSetup(1000); // setup for interpolation from current->next over 1/2 a second
-    while(bioloid.interpolating > 0){  // do this while we have not reached our new pose
-        bioloid.interpolateStep();     // move servos, if necessary. 
-        delay(3);
-       }
-       
+        currentPose = 0;
+        lcd.setCursor(9, 1);
+        lcd.print("Pose:");
+        lcd.print(currentPose);
        
   }
 //prev
@@ -179,17 +252,30 @@ void loop()
   {
         
 
-    currentPose = (currentPose -1)    % MAX_POSES;
-    Serial.print("Pose:");
-    Serial.println(currentPose);
+    currentPose = (currentPose -1);
+    if(currentPose < 0)
+    {
+      currentPose = MAX_POSES-1;
+    }
+    
+  // set the cursor to column 0, line 1
+  // (note: line 1 is the second row, since counting begins with 0):
+  lcd.setCursor(9, 1);
+  lcd.print("Pose:");
+  lcd.print(currentPose);
+  
    
   }
 //next
   if(debounceDigitalRead(4) == true)
   {
     currentPose = (currentPose +1)    % MAX_POSES;
-    Serial.print("Pose:");
-    Serial.println(currentPose);
+  // set the cursor to column 0, line 1
+  // (note: line 1 is the second row, since counting begins with 0):
+  lcd.setCursor(9, 1);
+    lcd.print("Pose:");
+    lcd.print(currentPose);
+    
    
     
   }
@@ -275,5 +361,26 @@ boolean debounceDigitalRead(int button)
   
   return(false);
 }
+
+
+
+//This function will write a 2 byte integer to the eeprom at the specified address and address + 1
+void EEPROMWriteInt(int p_address, int p_value)
+      {
+      byte lowByte = ((p_value >> 0) & 0xFF);
+      byte highByte = ((p_value >> 8) & 0xFF);
+
+      EEPROM.write(p_address, lowByte);
+      EEPROM.write(p_address + 1, highByte);
+      }
+
+//This function will read a 2 byte integer from the eeprom at the specified address and address + 1
+unsigned int EEPROMReadInt(int p_address)
+      {
+      byte lowByte = EEPROM.read(p_address);
+      byte highByte = EEPROM.read(p_address + 1);
+
+      return ((lowByte << 0) & 0xFF) + ((highByte << 8) & 0xFF00);
+      }
 
 
