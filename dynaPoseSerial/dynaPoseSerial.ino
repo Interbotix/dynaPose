@@ -1,65 +1,25 @@
 #include <ax12.h>
 #include <BioloidController.h>
 
-#include <EEPROM.h> //Needed to access the eeprom read write functions
-
 //#include "poses.h"
 
-
-
-#define SERVOCOUNT 5
+#define SERVOCOUNT 8
 #define LED_PIN 0
-#define TORQUE_BUTTON_PIN  1
-#define ENTER_BUTTON_PIN  2
-#define MODE_BUTTON_PIN  3
-#define PREV_BUTTON_PIN  4
-#define NEXT_BUTTON_PIN  5
-
-
-#define NUMBER_OF_MODES 4;
-
 #define MAX_POSES 5
-//#define MAX_POSES 5
-
-
-
-
-
 
 BioloidController bioloid = BioloidController(1000000);
-
-int positions[SERVOCOUNT+1] ;
-
-int buttonState[5];             // the current reading from the input pin
-int lastButtonState[5] = {LOW,LOW,LOW,LOW,LOW};   // the previous reading from the input pin
-int isTorqeOn = 1;
-int currentPose = 0;
-
-int mode = 0; //mode 0= save 1=set 2 = play 3 = position export
-
-// the following variables are long's because the time, measured in miliseconds,
-// will quickly become a bigger number than can be stored in an int.
-long lastDebounceTime[5] = {0,0,0,0,0};  // the last time the output pin was toggled
-long debounceDelay = 50;    // the debounce time; increase if the output flickers
-
-int reading[5];
-  
-//int MAX_POSES  = 5;
-
-//int i = 0; //counter for renaming 
-  
-//int poses[MAX_POSES][SERVOCOUNT+1]; //10 poses
 
 
 int poseData[SERVOCOUNT][MAX_POSES] ;
 
-
-
-//int currentPose = 0;
-
+int servoError = 0 ; // 0 = no errors, continue with the program. 1 = error on at least one servo (this usually means a servo cannot be found)
+int isTorqueOn = 0;
+int currentPose;
 void setup()
 {
+  Serial.begin(9600); //start serial communications at 9600bps
 
+  // initialize pose data to -1
   for(int j = 0; j<MAX_POSES;j++)
   {
     for(int i = 0; i<SERVOCOUNT;i++)
@@ -67,36 +27,36 @@ void setup()
       poseData[i][j] = -1;
     }
   }
-  
 
-
-    Serial.begin(9600);
-
-  
-    Serial.println("DYNAPose");
-    Serial.println("-----OPTIONS-----");
-    Serial.println("1: Relax Servos");
-    Serial.println("2: Enable Torque and Report Servo Position");
-    Serial.println("3: Save Current position");
-    Serial.println("4: Display Sequence");
-    Serial.println("5: Play Sequence Once");
-    Serial.println("Coming Soon");
-    Serial.println("6: Change Speed");
-    Serial.println("7: Set Next Pose");
-    
-  
-    Serial.println("Enter '1' to relax servos. Enter '2' to turn on torque and report position.");
-  
-  
-  positions[0] = SERVOCOUNT;
   
   delay(100);  
+  
+  
+  checkServos();  
+  
+  relaxServos(); //start servos in relaxed state
+
+
+
+  
+  Serial.println("DYNAPose");
+  Serial.println("-----OPTIONS-----");
+  Serial.println("1: Relax Servos");
+  Serial.println("2: Enable Torque and Report Servo Position");
+  Serial.println("3: Save Current position");
+  Serial.println("4: Display Sequence");
+  Serial.println("5: Play Sequence Once");
+  Serial.println("Coming Soon");
+  Serial.println("6: Change Speed");
+  Serial.println("7: Set Next Pose");
+    
   
         
 }
 
 void loop() 
 {
+  
   int inByte = Serial.read();
 
   switch (inByte)
@@ -120,33 +80,73 @@ void loop()
     
     case '5':
       playPoses();
-    break;
+    break;  
+  }   
+}
+
+
+void checkServos()
+{
     
+  Serial.print("Looking for Servos 1 - ");
+  Serial.println(SERVOCOUNT);
+  
+  Serial.println("Servos Relaxed");
     
+  for(int i = 0; i<SERVOCOUNT;i++)
+  {
+    int id = i+1;  //the ids for the servos start at 1 while the array indexes start at 0. Add '1' to the array index to get the two to match up
+    //use ax12GetRegister to check the id on a servo - if the servo is not connected/ communicating this will not return the correct id 
+    if(id != ax12GetRegister(id, 3, 1));
+    {
+      servoError = 1; //the servo did not respond / did not respond correctly, so set the servoError to '1'
+      Serial.print("Servo #");
+      Serial.print(id);
+      Serial.println(" not located");
+    }  
+    delay(1); //short pause before the next loop / dynamixel call
+  }
+  
+  if(servoError == 0)
+  {
+    Serial.print("All ");
+    Serial.print(SERVOCOUNT);
+    Serial.println(" servos located");
     
-  } 
+  }
+  
+  else
+  {
+    
+    Serial.println("Servo(s) are missing and/or not IDed properly");
+  }
+  
 }
 
 
 void relaxServos()
 {
+  isTorqueOn = false;
+  Serial.print("torque is:");
+  Serial.println(isTorqueOn);
   
-    Serial.println("Servos Relaxed");
+  Serial.println("Servos Relaxed");
     
-    for(int i = 0; i<SERVOCOUNT;i++)
-    {
-      int id = i+1;
-      Relax(id);
-
-      delay(10);
-    }
-  
+  for(int i = 0; i<SERVOCOUNT;i++)
+  {
+    int id = i+1;
+    Relax(id);
+    delay(10);
+  }
   
 }
     
 
 void torqueServos()
 {
+  isTorqueOn = true;
+  Serial.print("torque is:");
+  Serial.println(isTorqueOn);
     for(int i = 0; i<SERVOCOUNT;i++)
     {
       int id = i+1;
@@ -169,7 +169,6 @@ void torqueServos()
     }
   }
     Serial.println("};");
-  
   
 }
     
@@ -278,26 +277,5 @@ void playPoses()
     
     
 
-
-
-
-//This function will write a 2 byte integer to the eeprom at the specified address and address + 1
-void EEPROMWriteInt(int p_address, int p_value)
-      {
-      byte lowByte = ((p_value >> 0) & 0xFF);
-      byte highByte = ((p_value >> 8) & 0xFF);
-
-      EEPROM.write(p_address, lowByte);
-      EEPROM.write(p_address + 1, highByte);
-      }
-
-//This function will read a 2 byte integer from the eeprom at the specified address and address + 1
-unsigned int EEPROMReadInt(int p_address)
-      {
-      byte lowByte = EEPROM.read(p_address);
-      byte highByte = EEPROM.read(p_address + 1);
-
-      return ((lowByte << 0) & 0xFF) + ((highByte << 8) & 0xFF00);
-      }
 
 
