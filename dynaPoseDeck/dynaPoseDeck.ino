@@ -1,3 +1,5 @@
+//Experimental self-contained DYNApose firmware
+
 #include <ax12.h>
 #include <BioloidController.h>
 
