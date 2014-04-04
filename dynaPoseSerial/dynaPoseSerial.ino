@@ -17,7 +17,7 @@ int isTorqueOn = 0;
 int nextSavePose;
 int mode = 0; // mode for the serial input. 0 = normal menu mode. 2 = speed change mode
 int bioloidDelay = 1000;
-
+int torqueCount = 1; //a counter for when a user turns the torque on
 
 void setup()
 {
@@ -33,12 +33,19 @@ void setup()
 
 
 
-  Serial.begin(9600); //start serial communications at 9600bps
+  Serial.begin(38400); //start serial communications at 38400bps
 
-  Serial.println("Starting InterbotiX DYNAPose");
-  Serial.println(" ");
-  Serial.println("Current DYNAPose Settings:");
   
+  Serial.println("  _______     ___   _          _____               ");
+  Serial.println(" |  __ \\ \\   / / \\ | |   /\\   |  __ \\              ");
+  Serial.println(" | |  | \\ \\_/ /|  \\| |  /  \\  | |__) |__  ___  ___  ");
+  Serial.println(" | |  | |\\   / | . ` | / /\\ \\ |  ___/ _ \\/ __|/ _ \\ ");
+  Serial.println(" | |__| | | |  | |\\  |/ ____ \\| |  | (_) \\__ \\  __/ ");
+  Serial.println(" |_____/  |_|  |_| \\_/_/    \\_\\_|   \\___/|___/\\___| ");
+  
+  
+  
+  Serial.println("Current DYNAPose Settings:");
   Serial.print("  Number of Servos:");
   Serial.println(SERVO_COUNT);
   Serial.print("  Number of Poses:");
@@ -132,10 +139,11 @@ void loop()
           mode = 8;
           Serial.print("Enter a number between 1 and ");
           Serial.println(POSE_COUNT);
+        break;  
+        
         
         case '9':
           centerServos();
-
         break;  
       }   
         
@@ -145,7 +153,7 @@ void loop()
     else if (mode == 7)
     {
       int tempBioloidDelay = Serial.parseInt();
-      if (tempBioloidDelay > 500 && tempBioloidDelay < 10000)
+      if (tempBioloidDelay > 499 && tempBioloidDelay < 10001)
       {
         bioloidDelay = tempBioloidDelay;
         Serial.print("New Speed:");
@@ -212,7 +220,7 @@ void checkServos()
     }  
     //if all servos are found, then 'servoError' remains '0' i.e. no error 
     
-    delay(1); //short pause before the next loop / dynamixel call
+    delay(5); //short pause before the next loop / dynamixel call
   }
   
   //if all servos are found, display a success message
@@ -241,7 +249,7 @@ void relaxServos()
   {
     int id = i+1;
     Relax(id);
-    delay(10);
+    delay(5); //short pause before the next loop / dynamixel call
   }
   
   isTorqueOn = false; 
@@ -260,15 +268,18 @@ void torqueServos()
       int id = i+1;
       TorqueOn(id);
 
-      delay(10);
+      delay(5); //short pause before the next loop / dynamixel call
     }
  
  
     Serial.println("----------");
     Serial.println("Torque On!");
     Serial.println("Code for current pose:");
-    Serial.print("  PROGMEM prog_uint16_t poseX[] = {");
-    Serial.println("----------");
+    Serial.print("  PROGMEM prog_uint16_t poseTemp");
+    Serial.print(torqueCount++);
+    Serial.print("[] = {");
+    Serial.print(SERVO_COUNT);
+    Serial.print(",");
  
     for(int i = 0; i<SERVO_COUNT;i++)
     {
@@ -280,6 +291,7 @@ void torqueServos()
       }
     }
     Serial.println("};");
+    Serial.println("----------");
   
 }
     
@@ -292,6 +304,13 @@ void savePose()
   Serial.print("Saving Pose #");
   Serial.println(nextSavePose + 1);
   
+  
+  Serial.print("  PROGMEM prog_uint16_t pose");
+    Serial.print(nextSavePose);
+    Serial.print("[] = {");
+    Serial.print(SERVO_COUNT);
+    Serial.print(",");
+    
   for(int i = 0; i<SERVO_COUNT;i++)
   {
     int id = i+1;
@@ -304,7 +323,17 @@ void savePose()
       Serial.print(id);
       Serial.println(" not read! Please check servos and re-save pose");
     }
+    
+
+      Serial.print(poseData[i][nextSavePose]);
+      if(i < SERVO_COUNT-1)
+      {
+        Serial.print(",");
+      }
+      
+    delay(1); //short pause before the next loop / dynamixel call
   }
+  Serial.println("};");
 
   //check if there is no error (errorFlag is 0).   
   if (errorFlag ==0)
@@ -314,6 +343,12 @@ void savePose()
 
   Serial.print("The Next save #");
   Serial.println(nextSavePose + 1 );
+  Serial.println(" ");
+  
+  if(nextSavePose == 0)
+  {
+   displayMenu(); 
+  }
   
 }
 
@@ -322,26 +357,43 @@ void savePose()
 
 void displayPoses()
 {   
-    
+  int errorFlag = 0;
   
   for(int j = 0; j<POSE_COUNT;j++)
   {
-    Serial.print("  PROGMEM prog_uint16_t poseX[] = {");
+    Serial.print("  PROGMEM prog_uint16_t pose");
+    Serial.print(j);
+    Serial.print("[] = {");
+    Serial.print(SERVO_COUNT);
+    Serial.print(",");
+ 
 
 
     for(int i = 0; i<SERVO_COUNT;i++)
     {
       
       int id = i+1;
-        Serial.print(poseData[i][j]);
+      Serial.print(poseData[i][j]);
       if(i < SERVO_COUNT-1)
       {
         Serial.print(",");
       }
       
+      if(poseData[i][j] == -1)      
+      {
+        errorFlag = 1; 
+      }
+    
+     delay(1); //short pause before the next loop / dynamixel call
+      
     }
     
     Serial.println("};");
+  }
+  
+  if(errorFlag = 1)
+  {
+    Serial.println("At least one position has not been sent"); 
   }
   
 }
@@ -439,23 +491,25 @@ void checkVoltage(){
    // wait, then check the voltage (LiPO safety)
   float voltage = (ax12GetRegister (1, AX_PRESENT_VOLTAGE, 1)) / 10.0;
 
+  Serial.println("----------");
   Serial.print ("System Voltage: ");
   Serial.print (voltage);
   Serial.println (" volts.");
   if (voltage < 10.0)
   {
-    Serial.println("----------");
+
     Serial.println("Voltage levels below 10v, please charge battery.");
     Serial.println("----------");
     servoError == 1;
   }  
   if (voltage > 10.0)
   {
-    Serial.println("----------");
+
     Serial.println("Voltage levels nominal.");
     Serial.println("----------");
   }
    
+  delay(1); //short pause before the next loop / dynamixel call
   
 
 }
@@ -473,7 +527,7 @@ void displayMenu()
     Serial.println(")");
     Serial.println("4: Display All Poses in memory");
     Serial.println("5: Play Sequence Once");
-    Serial.println("6: Play Sequence Indefinitley");
+    Serial.println("6: Play Sequence Repeat");
     Serial.println("7: Change Speed");
     Serial.println("8: Set Next Pose Number"); 
     Serial.println("9: Center All Servos"); 
@@ -495,9 +549,27 @@ void centerServos()
         for(int i = 0; i<SERVO_COUNT;i++)
         {
           int id = i+1;
+          int model = ax12GetRegister (id, AX_MODEL_NUMBER_L, 2);
+          int centerPosition = -1;
+          
+          if(model == 12 || model == 18 || model == 300)
+          {
+            centerPosition = 512;
+          }
+          else if(model == 360 || model == 29 || model == 310 || model == 320)
+          {
+            centerPosition = 2048;
+          }
+         
+          else
+          {
+            Serial.println("Error, model not found");
+          }
+           Serial.println(centerPosition);
+
           //SetPosition(id, positions[i]);
           //Serial.println(poseData[i][j]);
-           bioloid.setNextPose(id,512);
+           bioloid.setNextPose(id,centerPosition);
            
          }
 
