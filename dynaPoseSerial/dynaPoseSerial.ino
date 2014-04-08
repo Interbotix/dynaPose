@@ -1,11 +1,9 @@
 #include <ax12.h>
 #include <BioloidController.h>
 
-//#include "poses.h"
-
-#define SERVO_COUNT 8
-#define LED_PIN 0
+#define SERVO_COUNT 1
 #define POSE_COUNT 5
+#define ERROR_BIT_CHECK 0
 
 BioloidController bioloid = BioloidController(1000000);
 
@@ -21,6 +19,8 @@ int torqueCount = 1; //a counter for when a user turns the torque on
 
 void setup()
 {
+  delay(100);
+  Serial.begin(38400); //start serial communications at 38400bps
   
   // initialize pose data to -1 - this will help to identify 'bad' servo data if a servo gets disconnected
   for(int j = 0; j<POSE_COUNT;j++)
@@ -33,7 +33,6 @@ void setup()
 
 
 
-  Serial.begin(38400); //start serial communications at 38400bps
 
   
   Serial.println("  _______     ___   _          _____               ");
@@ -52,7 +51,15 @@ void setup()
   Serial.println(POSE_COUNT);
   Serial.print("  Default Pose-to-Pose Delay:");
   Serial.println(bioloidDelay);
-  
+  Serial.print("  Error-Bit Checking:");
+  if(ERROR_BIT_CHECK == 1)
+  {
+    Serial.println("On");
+  }
+  else
+  {
+    Serial.println("Off");
+  }
   Serial.println("----------");
   
   
@@ -102,49 +109,55 @@ void loop()
       int inByte = Serial.read();       
       switch (inByte)
       {
-        case '1':    
+        case '0':    
           relaxServos();
         break;    
     
-        case '2':
+        case '1':
           torqueServos(); 
         break;
     
-        case '3':
+        case '2':
           savePose();
         break;
         
-        case '4':
+        case '3':
           displayPoses();
         break;
         
         
-        case '5':
+        case '4':
           playPosesOnce(0);
         break;  
         
         
-        case '6':
+        case '5':
           playPosesRepeat();
         break;  
         
         
-        case '7':
+        case '6':
           mode = 7;
           Serial.println("Enter a value 500-10000 for the delay between eash pose in ms");
         break;  
         
         
-        case '8':
+        case '7':
           mode = 8;
           Serial.print("Enter a number between 1 and ");
           Serial.println(POSE_COUNT);
         break;  
         
         
-        case '9':
+        case '8':
           centerServos();
         break;  
+        
+        case '9':
+          checkServos();
+        break;  
+        
+        
       }   
         
     }
@@ -214,13 +227,77 @@ void checkServos()
     if(id != ax12GetRegister(id, AX_ID, 1))
     {
       servoError = 1; //the servo did not respond / did not respond correctly, so set the servoError to '1'
-      Serial.print("Servo #");
+      Serial.print("ERROR: Servo #");
       Serial.print(id);
       Serial.println(" not located");
     }  
     //if all servos are found, then 'servoError' remains '0' i.e. no error 
     
-    delay(5); //short pause before the next loop / dynamixel call
+    delay(10); //short pause before the next loop / dynamixel call
+    
+    
+    if(ERROR_BIT_CHECK == 1)
+    {
+      
+      int errorBit = ax12GetLastError();
+      Serial.print("    Servo # ");
+        Serial.print(id);
+  
+  
+      Serial.print("     Error Bit:");
+      Serial.println(errorBit);
+      
+      
+      if(ERR_NONE & errorBit == 0)
+      {
+        Serial.println("          No Errors Found");
+  
+      }
+      
+      if(ERR_VOLTAGE & errorBit)
+      {
+        Serial.println("          Voltage Error");
+  
+      }
+      
+      if(ERR_ANGLE_LIMIT & errorBit)
+      {
+        Serial.println("          Angle Limit Error");
+  
+      }
+      
+      if(ERR_OVERHEATING & errorBit)
+      {
+        Serial.println("          Overheating Error");
+  
+      }
+      
+      if(ERR_RANGE & errorBit)
+      {
+        Serial.println("          Range Error");
+  
+      }
+      
+      if(ERR_CHECKSUM & errorBit)
+      {
+        Serial.println("          Checksum Error");
+  
+      }
+      
+      if(ERR_OVERLOAD & errorBit)
+      {
+        Serial.println("          Overload Error");
+  
+      }
+      
+      
+      if(ERR_INSTRUCTION & errorBit)
+      {
+        Serial.println("          Instruction Error");
+  
+      }
+    }
+    
   }
   
   //if all servos are found, display a success message
@@ -249,7 +326,7 @@ void relaxServos()
   {
     int id = i+1;
     Relax(id);
-    delay(5); //short pause before the next loop / dynamixel call
+    delay(10); //short pause before the next loop / dynamixel call
   }
   
   isTorqueOn = false; 
@@ -268,7 +345,7 @@ void torqueServos()
       int id = i+1;
       TorqueOn(id);
 
-      delay(5); //short pause before the next loop / dynamixel call
+      delay(10); //short pause before the next loop / dynamixel call
     }
  
  
@@ -289,6 +366,7 @@ void torqueServos()
       {
         Serial.print(",");
       }
+      delay(10);
     }
     Serial.println("};");
     Serial.println("----------");
@@ -331,7 +409,7 @@ void savePose()
         Serial.print(",");
       }
       
-    delay(1); //short pause before the next loop / dynamixel call
+    delay(10); //short pause before the next loop / dynamixel call
   }
   Serial.println("};");
 
@@ -384,7 +462,7 @@ void displayPoses()
         errorFlag = 1; 
       }
     
-     delay(1); //short pause before the next loop / dynamixel call
+     delay(10); //short pause before the next loop / dynamixel call
       
     }
     
@@ -509,7 +587,7 @@ void checkVoltage(){
     Serial.println("----------");
   }
    
-  delay(1); //short pause before the next loop / dynamixel call
+  delay(10); //short pause before the next loop / dynamixel call
   
 
 }
@@ -520,17 +598,18 @@ void displayMenu()
  
     Serial.println("----------");
     Serial.println("-----MENU OPTIONS-----");
-    Serial.println("1: Relax Servos");
-    Serial.println("2: Enable Torque and Report Servo Position");
-    Serial.print("3: Save Current Position to next pose(");
+    Serial.println("0: Relax Servos");
+    Serial.println("1: Enable Torque and Report Servo Position");
+    Serial.print("2: Save Current Position to next pose(");
     Serial.print(nextSavePose+1);
     Serial.println(")");
-    Serial.println("4: Display All Poses in memory");
-    Serial.println("5: Play Sequence Once");
-    Serial.println("6: Play Sequence Repeat");
-    Serial.println("7: Change Speed");
-    Serial.println("8: Set Next Pose Number"); 
-    Serial.println("9: Center All Servos"); 
+    Serial.println("3: Display All Poses in memory");
+    Serial.println("4: Play Sequence Once");
+    Serial.println("5: Play Sequence Repeat");
+    Serial.println("6: Change Speed");
+    Serial.println("7: Set Next Pose Number"); 
+    Serial.println("8: Center All Servos"); 
+    Serial.println("9: Scan All Servos"); 
     Serial.println("----------");
 }
 
