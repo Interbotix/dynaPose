@@ -14,7 +14,7 @@ int servoError = 0 ; // 0 = no errors, continue with the program. 1 = error on a
 int isTorqueOn = 0;
 int nextSavePose;
 int mode = 0; // mode for the serial input. 0 = normal menu mode. 2 = speed change mode
-int bioloidDelay = 1000;
+int bioloidDelay = 5000;
 int torqueCount = 1; //a counter for when a user turns the torque on
 
 void setup()

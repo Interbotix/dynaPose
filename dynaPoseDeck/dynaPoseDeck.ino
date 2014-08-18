@@ -60,7 +60,7 @@ long debounceDelay = 50;    // the debounce time; increase if the output flicker
 
 int reading[5];
   
-int MAX_POSES  = 5;
+int MAX_POSES  = 10;
   
 //int poses[MAX_POSES][SERVOCOUNT+1]; //10 poses
 void setup()
@@ -99,6 +99,7 @@ void setup()
   lcd.setCursor(8, 1);
   lcd.print("Pose ");
   lcd.print(currentPose);
+  lcd.print(" ");
         
 }
 
@@ -158,6 +159,7 @@ void loop()
         lcd.setCursor(8, 1);
         lcd.print("Pose ");
         lcd.print(currentPose);
+        lcd.print("  ");
         
         
 
@@ -216,11 +218,11 @@ void loop()
              currentPose = (currentPose + 1)% MAX_POSES;
             
             
-            lcd.setCursor(0, 1);
-            lcd.print("delay ");
-            lcd.print(analogRead(0) * 1);
+            //lcd.setCursor(0, 1);
+            //lcd.print("delay ");
+            //lcd.print(analogRead(0) * 1);
             
-            delay(analogRead(0) * 1);
+            delay(350);
           
          }
      

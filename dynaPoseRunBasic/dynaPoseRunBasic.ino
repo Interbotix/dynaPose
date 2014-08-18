@@ -27,6 +27,7 @@ PROGMEM prog_uint16_t poseTemp1[] = {6,2130,1302,1413,1815,513,510};
 
 //PhantomX Hexapod Example
 
+int bioloidDelay = 5000;
 
 
 void setup()
@@ -36,7 +37,7 @@ void setup()
   bioloid.poseSize = SERVO_COUNT;  // define the poseSize for the bioloid controller
   bioloid.loadPose(poseTemp1);     // load the pose from FLASH, into the nextPose buffer
   bioloid.readPose();              // read in current servo positions to the curPose buffer 
-  bioloid.interpolateSetup(1000); // setup for interpolation from current->next over 1 second
+  bioloid.interpolateSetup(bioloidDelay); // setup for interpolation from current->next over 1 second
   
   while(bioloid.interpolating > 0)
   {  // do this while we have not reached our new pose

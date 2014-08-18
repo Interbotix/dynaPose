@@ -5,7 +5,7 @@
 #define SERVO_COUNT 6            //the number of servos that will be attached - change this for your specific robot
 #define POSE_COUNT 5
 
-#define DEFAULT_BIOLID_DELAY 1000  //the time in ms it will take to move from one pose to the next
+#define DEFAULT_BIOLID_DELAY 5000  //the time in ms it will take to move from one pose to the next
 #define DEFAULT_POSE_DELAY 1000    //the time to hold a pose before moving to the next pose
 
 BioloidController bioloid = BioloidController(1000000);  //initialize the bioloid controller to 1000000 baud
@@ -34,7 +34,7 @@ int playPoseOnce( const unsigned int * pose, int bioloidDelay)
 
     bioloid.loadPose(poseTemp1);     // load the pose from FLASH, into the nextPose buffer
     bioloid.readPose();              // read in current servo positions to the curPose buffer 
-    bioloid.interpolateSetup(1000); // setup for interpolation from current->next over 1 second
+    bioloid.interpolateSetup(bioloidDelay); // setup for interpolation from current->next over 1 second
       
     while(bioloid.interpolating > 0)
     {  // do this while we have not reached our new pose
